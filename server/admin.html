@@ -1,0 +1,1027 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="pageTitle">INTEGRATED ADMIN CENTER</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background: #f1f5f9;
+      color: #1e293b;
+    }
+
+    .container {
+      width: 100%;
+      max-width: none;
+      margin: 0;
+    }
+
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+    }
+
+    h1 {
+      color: #1E293B;
+      margin-top: 0;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 13px;
+      margin-top: 12px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      font-size: 15px;
+    }
+
+    button {
+      background: #1E293B;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #e96d00;
+    }
+
+    #dashboard {
+      display: none;
+    }
+
+    #message {
+      margin-top: 15px;
+      color: #d9534f;
+    }
+
+    .info {
+      color: #777;
+      font-size: 14px;
+    }
+
+    /* 관리자 표 디자인 */
+.admin-table-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.admin-table-card h3 {
+  color: #1e293b;
+  font-size: 17px;
+  margin-bottom: 16px;
+}
+
+.admin-table-card table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+  color: #334155;
+}
+
+.admin-table-card th {
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 11px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-table-card td {
+  padding: 11px !important;
+  border-bottom: 1px solid #edf2f7;
+}
+
+/* 관리자 대시보드 레이아웃 */
+.admin-layout {
+  display: flex;
+  min-height: 750px;
+  background: #f1f5f9;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* 왼쪽 사이드바 */
+.admin-sidebar {
+  width: 230px;
+  flex-shrink: 0;
+  background: #1e293b;
+  color: #ffffff;
+  padding: 25px 18px;
+}
+
+.admin-sidebar h2 {
+  font-size: 18px;
+  margin-bottom: 35px;
+  color: #ffffff;
+}
+
+.admin-sidebar .menu-item {
+  display: block;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  color: #cbd5e1;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.admin-sidebar .menu-item.active {
+  background: #334155;
+  color: #ffffff;
+}
+
+.admin-main {
+  flex: 1;
+  min-width: 0;
+  padding: 30px;
+  background: #f8fafc;
+}
+
+/* 로그인 화면 디자인 */
+#login {
+  max-width: 460px;
+  margin: 80px auto;
+  padding: 40px;
+}
+
+#login h2 {
+  text-align: center;
+  font-size: 20px;
+  margin-bottom: 20px;
+}
+
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+
+
+    <section class="card" id="login">
+<div style="text-align: center; margin-bottom: 30px;">
+  <h1 id="mainTitle" style="font-size: 28px; margin-bottom: 10px;">
+    CASTLE CONTROL CENTER
+  </h1>
+  <p class="info" style="letter-spacing: 2px;">
+    SITE MANAGEMENT SYSTEM
+  </p>
+</div>
+      <h2>관리자 로그인</h2>
+
+      <input
+        type="email"
+        id="email"
+        placeholder="관리자 이메일"
+      >
+
+      <input
+        type="password"
+        id="password"
+        placeholder="관리자 비밀번호"
+      >
+
+      <button onclick="loginAdmin()">로그인</button>
+
+      <p id="message"></p>
+    </section>
+
+    <section id="dashboard" class="card">
+
+    <div class="admin-layout">
+
+<aside class="admin-sidebar">
+<h2>CASTLE ADMIN</h2>
+
+<p class="sidebar-label">MAIN MENU</p>
+
+<a href="#" class="menu-item active"
+   onclick="showAdminPage('overview', this); return false;">
+  ▦ 전체 대시보드
+</a>
+
+<p class="sidebar-label">SITE MANAGEMENT</p>
+
+<a href="#" class="menu-item"
+   onclick="openManagedSite('NAME-TEC', this); return false;">
+  🌐 NAME-TEC
+</a>
+
+<a href="#" class="menu-item"
+   onclick="openManagedSite('PIN-OUT', this); return false;">
+  🌐 PIN-OUT
+</a>
+
+<a href="#" class="menu-item"
+   onclick="showAdminPage('sites', this); return false;">
+  ＋ 새 사이트 등록
+</a>
+
+<p class="sidebar-label">MANAGEMENT</p>
+
+<a href="#" class="menu-item"
+   onclick="showAdminPage('allManagement', this); return false;">
+  ▤ 통합 통계 관리
+</a>
+</aside>
+
+<main class="admin-main">
+
+<div id="overviewPage" class="admin-page">
+
+<div id="overviewStats" style="display:none; margin-top:25px;">
+
+  <h2>전체 운영 현황</h2>
+  <p class="info">통합 관리자 대시보드</p>
+
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:15px;">
+
+    <div class="card">
+      <p class="info">전체 회원</p>
+      <h2 id="totalMemberCount">0명</h2>
+      <p>가입 회원 수</p>
+    </div>
+
+    <div class="card">
+      <p class="info">운영 사이트</p>
+      <h2 id="totalSiteCount">0개</h2>
+      <p>등록된 전체 사이트</p>
+    </div>
+
+    <div class="card">
+      <p class="info">전체 결제</p>
+      <h2 id="totalPaymentCount">0건</h2>
+      <p>누적 결제 건수</p>
+    </div>
+
+    <div class="card">
+      <p class="info">이용권 변경</p>
+      <h2 id="totalCreditLogCount">0건</h2>
+<p>누적 변경 기록</p>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<div id="sitesPage" class="admin-page" style="display:none;">
+<div id="siteSelection">
+
+  <h3>관리할 사이트 선택</h3>
+
+  <select id="siteSelect" onchange="selectSite()">
+    <option value="">사이트 선택</option>
+  </select>
+
+  <p id="siteMessage" class="info"></p>
+
+</div>  
+<div id="siteRegistration" style="margin: 15px 0; padding: 12px; border: 1px solid #e8e4df; border-radius: 10px;">   
+
+<h3 style="margin-top:0;">새 사이트 등록</h3>
+
+<div style="display:flex; gap:8px; flex-wrap:wrap;">
+  <input
+    type="text"
+    id="newSiteName"
+    placeholder="사이트 이름 (예: PIN-OUT)"
+    style="flex:1; min-width:160px; margin:0;"
+  >
+
+  <input
+    type="text"
+    id="newSiteSlug"
+    placeholder="식별 주소 (예: pin-out)"
+    style="flex:1; min-width:160px; margin:0;"
+  >
+</div>
+
+<button
+  type="button"
+  onclick="registerSite()"
+  style="width:auto; margin-top:10px;"
+>
+  사이트 등록
+</button>
+</div>
+<button
+  id="backToOverview"
+  type="button"
+  onclick="returnToOverview()"
+  style="
+    display:none;
+    width:auto;
+    margin-top:15px;
+    padding:10px 18px;
+    background:#1E293B;
+    color:white;
+    border:none;
+    border-radius:8px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+  "
+>
+  🏠 관리자 홈
+</button>
+
+
+</div>
+<div id="siteStats" style="display: none; margin-top: 25px;">
+
+  <h3>사이트 운영 현황</h3>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
+
+    <div class="card">
+      <p class="info">전체 회원</p>
+      <h2 id="memberCount">0명</h2>
+    </div>
+
+    <div class="card">
+      <p class="info">결제 건수</p>
+      <h2 id="paymentCount">0건</h2>
+    </div>
+
+    <div class="card">
+      <p class="info">이용권 변경 기록</p>
+      <h2 id="creditLogCount">0건</h2>
+    </div>
+
+  </div>
+
+</div>
+
+<div id="siteManagement" style="display:none;">
+<div class="site-tabs" style="display:flex; gap:10px; margin:20px 0;">
+  <button type="button" onclick="showSiteTab('members')">
+    회원 관리
+  </button>
+
+  <button type="button" onclick="showSiteTab('payments')">
+    결제 관리
+  </button>
+
+  <button type="button" onclick="showSiteTab('credits')">
+    이용권 관리
+  </button>
+
+  <button type="button" onclick="showSiteTab('stats')">
+    통계 분석
+  </button>
+</div>
+<div id="creditPage" class="admin-table-card" style="display:none; margin-top:30px;">
+  <h3>이용권 변경 기록</h3>
+
+  <div style="overflow-x: auto;">
+    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+      <thead>
+     <tr>
+        <th style="padding:12px;">기록 번호</th>
+        <th style="padding:12px;">회원 이메일</th>
+        <th style="padding:12px;">변경 횟수</th>
+        <th style="padding:12px;">변경 사유</th>
+        <th style="padding:12px;">변경일</th>
+     </tr>
+      </thead>
+      <tbody id="creditTable">
+        <tr>
+          <td colspan="5" style="padding: 15px;">
+            이용권 변경 기록을 불러오는 중입니다.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>    
+<div id="statsPage" class="admin-table-card" style="display:none; margin-top:30px;">
+  <h3>사이트 통계 분석</h3>
+
+  <p class="info">선택한 사이트의 운영 데이터를 분석합니다.</p>
+
+  <div class="card">
+    <p>전체 회원 수</p>
+    <h2 id="statsMemberCount">0명</h2>
+  </div>
+
+  <div class="card">
+    <p>전체 결제 건수</p>
+    <h2 id="statsPaymentCount">0건</h2>
+  </div>
+
+  <div class="card">
+    <p>이용권 변경 기록</p>
+    <h2 id="statsCreditCount">0건</h2>
+  </div>
+</div>
+<div id="memberPage" class="admin-table-card" style="margin-top: 30px; display:none;">
+  <h3>회원 관리</h3>
+
+  <div style="overflow-x: auto;">
+    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+      <thead>
+        <tr>
+          <th style="padding: 12px;">회원 번호</th>
+          <th style="padding: 12px;">이메일</th>
+          <th style="padding: 12px;">보유 횟수</th>
+          <th style="padding: 12px;">프리미엄 만료일</th>
+        </tr>
+      </thead>
+      <tbody id="memberTable">
+        <tr>
+          <td colspan="4" style="padding: 15px;">
+            회원 정보를 불러오는 중입니다.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<div id="paymentPage" class="admin-table-card" style="margin-top: 35px; display:none;">
+  <h3>결제 내역 관리</h3>
+
+  <div style="overflow-x: auto;">
+    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+      <thead>
+        <tr>
+          <th style="padding: 12px;">결제 번호</th>
+          <th style="padding: 12px;">회원 이메일</th>
+          <th style="padding: 12px;">금액</th>
+          <th style="padding: 12px;">상품 종류</th>
+          <th style="padding: 12px;">상태</th>
+          <th style="padding: 12px;">결제일</th>
+        </tr>
+      </thead>
+      <tbody id="paymentTable">
+        <tr>
+          <td colspan="6" style="padding: 15px;">
+            결제 내역이 없습니다.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</div>
+
+  </main>
+</div>
+
+  <script>
+    
+      const ADMIN_SITE_NAME = "CASTLE CONTROL CENTER";
+
+    document.getElementById("pageTitle").textContent = ADMIN_SITE_NAME;
+    document.getElementById("mainTitle").textContent = ADMIN_SITE_NAME;
+    let adminToken = null;
+
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => {
+    const entities = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    };
+
+    return entities[char];
+  });
+}
+
+
+    async function loginAdmin() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      const message = document.getElementById("message");
+
+      try {
+        const response = await fetch(
+          "http://localhost:3000/api/admin/login",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ email, password })
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          message.textContent = data.message;
+          return;
+        }
+
+        adminToken = data.token;
+
+        document.getElementById("login").style.display = "none";
+        document.getElementById("dashboard").style.display = "block";
+
+        await loadSites();
+        await loadOverviewStats();
+
+      } catch (error) {
+        message.textContent = "서버에 연결할 수 없습니다.";
+      }
+    }
+
+async function loadOverviewStats() {
+  try {
+    const response = await fetch(
+      "http://localhost:3000/api/admin/dashboard",
+      {
+        headers: {
+          Authorization: "Bearer " + adminToken
+        }
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.message || "전체 통계를 불러오지 못했습니다.");
+      return;
+    }
+
+    document.getElementById("totalMemberCount").textContent =
+      data.stats.totalMembers + "명";
+
+    document.getElementById("totalPaymentCount").textContent =
+      data.stats.totalPayments + "건";
+
+    document.getElementById("totalCreditLogCount").textContent =
+      data.stats.totalCreditLogs + "건";
+
+    document.getElementById("totalSiteCount").textContent =
+      data.stats.totalSites + "개";
+
+    document.getElementById("overviewStats").style.display = "block";
+
+  } catch (error) {
+    console.error("전체 통계 조회 오류:", error);
+  }
+}
+
+
+    async function loadSites() {
+      const response = await fetch(
+        "http://localhost:3000/api/admin/sites",
+        {
+          headers: {
+            Authorization: "Bearer " + adminToken
+          }
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        document.getElementById("siteMessage").textContent =
+          data.message || "사이트 목록을 불러오지 못했습니다.";
+        return;
+      }
+
+      const select = document.getElementById("siteSelect");
+
+      data.sites.forEach(site => {
+        const option = document.createElement("option");
+        option.value = site.id;
+        option.textContent = site.name;
+        select.appendChild(option);
+      });
+    }
+async function registerSite() {
+  const name = document.getElementById("newSiteName").value.trim();
+  const slug = document.getElementById("newSiteSlug").value.trim();
+
+  if (!name || !slug) {
+    alert("사이트 이름과 식별 주소를 모두 입력해 주세요.");
+    return;
+  }
+
+  try {
+    const response = await fetch("http://localhost:3000/api/admin/sites", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + adminToken
+      },
+      body: JSON.stringify({ name, slug })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.message || "사이트 등록에 실패했습니다.");
+      return;
+    }
+
+    alert("사이트가 등록되었습니다!");
+
+    document.getElementById("newSiteName").value = "";
+    document.getElementById("newSiteSlug").value = "";
+
+    await loadSites();
+
+  } catch (error) {
+    console.error("사이트 등록 오류:", error);
+    alert("서버와 통신할 수 없습니다.");
+  }
+}
+
+function returnToOverview() {
+  document.getElementById("siteSelect").value = "";
+  selectSite();
+}
+
+function openManagedSite(siteName, clickedMenu) {
+  const select = document.getElementById("siteSelect");
+
+  const option = Array.from(select.options).find(
+    option => option.textContent === siteName
+  );
+
+  if (!option) {
+    alert("등록된 사이트를 찾을 수 없습니다.");
+    return;
+  }
+
+  showAdminPage("sites", clickedMenu);
+
+  select.value = option.value;
+
+  document.getElementById("siteSelection").style.display = "none";
+
+  selectSite();
+}
+
+function showSiteTab(tab) {
+  document.getElementById("memberPage").style.display =
+    tab === "members" ? "block" : "none";
+
+  document.getElementById("paymentPage").style.display =
+    tab === "payments" ? "block" : "none";
+
+  document.getElementById("creditPage").style.display =
+    tab === "credits" ? "block" : "none";
+   
+document.getElementById("statsPage").style.display =
+  tab === "stats" ? "block" : "none"; 
+}
+
+
+function showAdminPage(page, clickedMenu) {
+
+
+  document.querySelectorAll(".menu-item").forEach(item => {
+    item.classList.remove("active");
+  });
+
+  clickedMenu.classList.add("active");
+
+  if (page === "overview") {
+    returnToOverview();   
+  }
+
+  if (page === "sites" || page === "members" ||
+      page === "payments" || page === "credits") {
+    if (page !== "sites" && !document.getElementById("siteSelect").value) {
+      alert("먼저 관리할 사이트를 선택해 주세요.");
+      return;
+    }
+  }
+
+document.getElementById("overviewPage").style.display =
+  page === "overview" ? "block" : "none";
+
+document.getElementById("overviewStats").style.display =
+  page === "overview" ? "block" : "none";
+
+document.getElementById("sitesPage").style.display =
+  page === "sites" ? "block" : "none";
+
+  document.getElementById("siteRegistration").style.display =
+    page === "sites" ? "block" : "none";
+
+  document.getElementById("siteStats").style.display =
+    page === "members" || page === "payments" ? "block" : "none";
+
+  document.getElementById("siteManagement").style.display =
+    page === "members" || page === "payments" ? "block" : "none";
+
+  document.getElementById("memberPage").style.display =
+    page === "members" ? "block" : "none";
+
+document.getElementById("paymentPage").style.display =
+    page === "payments" ? "block" : "none";
+}
+
+async function selectSite() {
+  const select = document.getElementById("siteSelect");
+  const siteMessage = document.getElementById("siteMessage");
+  const siteId = select.value;
+
+
+if (!siteId) {
+  siteMessage.textContent = "관리할 사이트를 선택해 주세요.";
+  document.getElementById("overviewStats").style.display = "block";
+  document.getElementById("siteStats").style.display = "none";
+  document.getElementById("siteManagement").style.display = "none";
+  document.getElementById("siteRegistration").style.display = "none";
+  document.getElementById("backToOverview").style.display = "none";
+  return;
+}
+
+
+document.getElementById("siteRegistration").style.display = "none";
+siteMessage.textContent = "사이트 운영 현황을 불러오는 중입니다...";
+document.getElementById("overviewStats").style.display = "none";
+document.getElementById("siteManagement").style.display = "block";
+document.getElementById("backToOverview").style.display = "inline-block";
+  try {
+    const headers = {
+      Authorization: "Bearer " + adminToken
+    };
+
+    const [membersRes, paymentsRes, logsRes] = await Promise.all([
+      fetch(`http://localhost:3000/api/admin/members?siteId=${siteId}`, { headers }),
+      fetch(`http://localhost:3000/api/admin/payments?siteId=${siteId}`, { headers }),
+      fetch(`http://localhost:3000/api/admin/credit-logs?siteId=${siteId}`, { headers })
+    ]);
+
+    if (!membersRes.ok || !paymentsRes.ok || !logsRes.ok) {
+      throw new Error("통계 정보를 불러오지 못했습니다.");
+    }
+
+    const members = await membersRes.json();
+    const payments = await paymentsRes.json();
+    const logs = await logsRes.json();
+    const creditTable = document.getElementById("creditTable");
+
+if (!logs.logs || logs.logs.length === 0) {
+  creditTable.innerHTML = `
+    <tr>
+      <td colspan="5" style="padding:15px;">
+        아직 이용권 변경 기록이 없습니다.
+      </td>
+    </tr>
+  `;
+} else {
+  creditTable.innerHTML = logs.logs.map(log => `
+    <tr>
+      <td style="padding:12px;">
+        ${log.id}
+      </td>
+
+      <td style="padding:12px;">
+        ${escapeHTML(log.user_email || "회원 정보 없음")}
+      </td>
+
+      <td style="padding:12px;">
+        ${Number(log.change_amount) > 0 ? "+" : ""}
+        ${Number(log.change_amount)}회
+      </td>
+
+      <td style="padding:12px;">
+        ${escapeHTML(log.reason || "사유 없음")}
+      </td>
+
+      <td style="padding:12px;">
+        ${escapeHTML(log.created_at || "")}
+      </td>
+    </tr>
+  `).join("");
+}
+
+const paymentTable = document.getElementById("paymentTable");
+
+if (!payments.payments || payments.payments.length === 0) {
+  paymentTable.innerHTML = `
+    <tr>
+      <td colspan="6" style="padding: 15px;">
+        아직 결제 내역이 없습니다.
+      </td>
+    </tr>
+  `;
+} else {
+  paymentTable.innerHTML = payments.payments.map(payment => `
+    <tr>
+      <td style="padding:12px; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${payment.id}">
+        ${payment.id}
+      </td>
+
+      <td style="padding:12px; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHTML(payment.email || "회원 정보 없음")}">
+        ${escapeHTML(payment.email || "회원 정보 없음")}
+      </td>
+
+      <td style="padding:12px;">
+        ${Number(payment.amount).toLocaleString("ko-KR")}원
+      </td>
+
+      <td style="padding:12px;">
+        ${escapeHTML(payment.product_type)}
+      </td>
+
+      <td style="padding:12px;">
+        ${escapeHTML(payment.status)}
+      </td>
+
+      <td style="padding:12px;">
+        ${escapeHTML(payment.created_at)}
+      </td>
+    </tr>
+  `).join("");
+}
+
+
+
+const memberTable = document.getElementById("memberTable");
+
+if (members.members.length === 0) {
+  memberTable.innerHTML = `
+    <tr>
+      <td colspan="4" style="padding: 15px;">
+        아직 등록된 회원이 없습니다.
+      </td>
+    </tr>
+  `;
+} else {
+  memberTable.innerHTML = members.members.map(member => `
+    <tr>
+      <td style="padding: 12px; border-bottom: 1px solid #eee;">
+        <span
+          title="${member.id}"
+          style="display:inline-block; max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+        >
+          ${member.id}
+        </span>
+      </td>
+
+      <td style="padding: 12px; border-bottom: 1px solid #eee;">
+        <button
+          type="button"
+          onclick="showMemberDetail(${member.id})"
+          title="${escapeHTML(member.email)}"
+          style="width:auto; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin:0; padding:5px 10px; background:#fff3e6; color:#e96d00;"
+        >
+          ${escapeHTML(member.email)}
+        </button>
+      </td>
+
+      <td style="padding: 12px; border-bottom: 1px solid #eee;">
+        ${member.credits}회
+      </td>
+
+      <td style="padding: 12px; border-bottom: 1px solid #eee;">
+        ${member.premium_until || "없음"}
+      </td>
+    </tr>
+  `).join("");
+}
+
+
+    document.getElementById("memberCount").textContent =
+      members.total + "명";
+
+    document.getElementById("paymentCount").textContent =
+      payments.total + "건";
+
+    document.getElementById("creditLogCount").textContent =
+      logs.total + "건";
+
+
+    
+    document.getElementById("siteStats").style.display = "block";
+
+    siteMessage.textContent =
+      select.options[select.selectedIndex].text + " 운영 현황";
+
+  } catch (error) {
+    siteMessage.textContent = error.message;
+  }
+}
+
+
+let selectedMemberId = null;
+
+// 회원 상세 정보 불러오기
+async function showMemberDetail(memberId) {
+  const siteId = document.getElementById("siteSelect").value;
+
+  try {
+    const response = await fetch(
+      `http://localhost:3000/api/admin/members/${memberId}?siteId=${siteId}`,
+      {
+        headers: {
+          Authorization: "Bearer " + adminToken
+        }
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.message || "회원 정보를 불러오지 못했습니다.");
+      return;
+    }
+
+    selectedMemberId = memberId;
+
+    document.getElementById("detailMemberId").textContent = data.member.id;
+    document.getElementById("detailMemberEmail").textContent = data.member.email;
+    document.getElementById("detailMemberCredits").textContent = data.member.credits + "회";
+    document.getElementById("detailMemberPremium").textContent =
+      data.member.premium_until || "없음";
+
+    document.getElementById("memberDetail").style.display = "block";
+    document.getElementById("memberDetail").scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+
+  } catch (error) {
+    alert("회원 정보를 불러오는 중 오류가 발생했습니다.");
+  }
+}
+
+// 이용권 지급 및 차감
+async function changeMemberCredits() {
+  if (!selectedMemberId) return;
+
+  const siteId = document.getElementById("siteSelect").value;
+  const amount = Number(document.getElementById("creditAmount").value);
+  const reason = document.getElementById("creditReason").value.trim();
+
+  if (!Number.isInteger(amount) || amount === 0) {
+    alert("변경할 횟수를 올바르게 입력해 주세요.");
+    return;
+  }
+
+  if (!reason) {
+    alert("변경 사유를 입력해 주세요.");
+    return;
+  }
+
+  if (!confirm(`${amount}회를 변경하시겠습니까?`)) return;
+
+  try {
+    const response = await fetch(
+      `http://localhost:3000/api/admin/members/${selectedMemberId}/credits?siteId=${siteId}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + adminToken
+        },
+        body: JSON.stringify({ amount, reason })
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.message || "이용권 변경에 실패했습니다.");
+      return;
+    }
+
+    alert(data.message);
+
+    document.getElementById("creditAmount").value = "";
+    document.getElementById("creditReason").value = "";
+
+    await showMemberDetail(selectedMemberId);
+    await selectSite();
+
+  } catch (error) {
+    alert("이용권 변경 중 서버 오류가 발생했습니다.");
+  }
+}
+
+
+  </script>
+</body>
+</html>
