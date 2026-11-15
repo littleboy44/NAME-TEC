@@ -519,7 +519,7 @@ function escapeHTML(value) {
 
       try {
         const response = await fetch(
-          "http://localhost:3000/api/admin/login",
+          "https://name-tec-server.onrender.com/api/admin/login",
           {
             method: "POST",
             headers: {
@@ -552,7 +552,7 @@ function escapeHTML(value) {
 async function loadOverviewStats() {
   try {
     const response = await fetch(
-      "http://localhost:3000/api/admin/dashboard",
+      "https://name-tec-server.onrender.com/api/admin/dashboard",
       {
         headers: {
           Authorization: "Bearer " + adminToken
@@ -589,7 +589,7 @@ async function loadOverviewStats() {
 
     async function loadSites() {
       const response = await fetch(
-        "http://localhost:3000/api/admin/sites",
+        "https://name-tec-server.onrender.com/api/admin/sites",
         {
           headers: {
             Authorization: "Bearer " + adminToken
@@ -624,7 +624,7 @@ async function registerSite() {
   }
 
   try {
-    const response = await fetch("http://localhost:3000/api/admin/sites", {
+    const response = await fetch("https://name-tec-server.onrender.com/api/admin/sites", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -768,9 +768,9 @@ document.getElementById("backToOverview").style.display = "inline-block";
     };
 
     const [membersRes, paymentsRes, logsRes] = await Promise.all([
-      fetch(`http://localhost:3000/api/admin/members?siteId=${siteId}`, { headers }),
-      fetch(`http://localhost:3000/api/admin/payments?siteId=${siteId}`, { headers }),
-      fetch(`http://localhost:3000/api/admin/credit-logs?siteId=${siteId}`, { headers })
+      fetch(`https://name-tec-server.onrender.com/api/admin/members?siteId=${siteId}`, { headers }),
+      fetch(`https://name-tec-server.onrender.com/api/admin/payments?siteId=${siteId}`, { headers }),
+      fetch(`https://name-tec-server.onrender.com/api/admin/credit-logs?siteId=${siteId}`, { headers })
     ]);
 
     if (!membersRes.ok || !paymentsRes.ok || !logsRes.ok) {
@@ -934,7 +934,7 @@ async function showMemberDetail(memberId) {
 
   try {
     const response = await fetch(
-      `http://localhost:3000/api/admin/members/${memberId}?siteId=${siteId}`,
+      `https://name-tec-server.onrender.com/api/admin/members/${memberId}?siteId=${siteId}`,
       {
         headers: {
           Authorization: "Bearer " + adminToken
@@ -990,7 +990,7 @@ async function changeMemberCredits() {
 
   try {
     const response = await fetch(
-      `http://localhost:3000/api/admin/members/${selectedMemberId}/credits?siteId=${siteId}`,
+      `https://name-tec-server.onrender.com/api/admin/members/${selectedMemberId}/credits?siteId=${siteId}`,
       {
         method: "POST",
         headers: {
