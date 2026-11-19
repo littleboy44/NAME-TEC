@@ -2170,17 +2170,14 @@ async function demoAuth() {
     closeModal();
     updateAuthButton();
     toast("로그인에 성공했습니다!");
-    if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", updateAuthButton);
-} else {
-  updateAuthButton();
-}
+
 
 
   } catch (error) {
     toast("서버에 연결할 수 없습니다.");
   }
 }
+
 
 async function demoRegister() {
   const email = document.getElementById("demoEmail").value;
@@ -2236,6 +2233,8 @@ async function checkNameTecServer() {
 }
 
 checkNameTecServer();
+updateAuthButton();
 </script>
+
 
 </body></html> 
