@@ -2170,7 +2170,12 @@ async function demoAuth() {
     closeModal();
     updateAuthButton();
     toast("로그인에 성공했습니다!");
-    document.addEventListener("DOMContentLoaded", updateAuthButton);
+    if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", updateAuthButton);
+} else {
+  updateAuthButton();
+}
+
 
   } catch (error) {
     toast("서버에 연결할 수 없습니다.");
