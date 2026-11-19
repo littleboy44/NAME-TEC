@@ -462,8 +462,14 @@
 </div>
 <header class="wrap nav">
   <a class="brand" href="#" style="text-decoration:none;color:inherit"><span class="brand-star" aria-hidden="true">✦</span> NAME-<span>TEC</span></a>
-  <nav class="navlinks"><a href="#generator">이름 만들기</a><a href="#premium">프리미엄</a><a href="#community">커뮤니티</a><button class="btn" onclick="openModal('auth')">로그인 / 가입</button></nav>
-</header>
+<nav class="navlinks">
+  <a href="#generator">이름 만들기</a>
+  <a href="#premium">프리미엄</a>
+  <a href="#community">커뮤니티</a>
+  <button class="btn" id="authButton" onclick="openModal('auth')">
+    로그인 / 가입
+  </button>
+</nav></header>
 <main>
 <section class="wrap hero">
   <div><div class="eyebrow"><span class="dot"></span> YOUR NAME, YOUR STORY</div>
@@ -2110,6 +2116,29 @@ function openModal(type){const title=document.getElementById("modalTitle"),conte
   <button class="btn" style="width:50%" onclick="demoRegister()">회원가입</button>
 </div>
 <p class="notice">회원가입 후 로그인해서 서비스를 이용할 수 있습니다.</p>`}else{title.textContent="결제 진행";content.innerHTML=`<p style="color:var(--muted);font-size:14px">이것은 결제 흐름 예시입니다. 카드 정보는 입력하지 마세요.</p><div class="field"><label>플랜</label><input id="checkoutPlan" readonly></div><div class="field"><label>결제 방식</label><select><option>카드 결제 (연결 전)</option><option>간편결제 (연결 전)</option></select></div><button class="btn" style="width:100%" onclick="toast('실제 결제 기능은 아직 연결되지 않았어요.');closeModal()">결제 기능 안내 보기</button>`}}
+
+function updateAuthButton() {
+  const authButton = document.getElementById("authButton");
+  const user = JSON.parse(localStorage.getItem("nametec_user") || "null");
+
+  if (!authButton) return;
+
+  if (user) {
+    authButton.textContent = "로그아웃";
+    authButton.onclick = logout;
+  } else {
+    authButton.textContent = "로그인 / 가입";
+    authButton.onclick = () => openModal("auth");
+  }
+}
+
+function logout() {
+  localStorage.removeItem("nametec_token");
+  localStorage.removeItem("nametec_user");
+
+  updateAuthButton();
+  toast("로그아웃되었습니다.");
+}
 async function demoAuth() {
   const email = document.getElementById("demoEmail").value;
   const password = document.getElementById("demoPassword").value;
@@ -2139,7 +2168,9 @@ async function demoAuth() {
     localStorage.setItem("nametec_user", JSON.stringify(data.user));
 
     closeModal();
+    updateAuthButton();
     toast("로그인에 성공했습니다!");
+    document.addEventListener("DOMContentLoaded", updateAuthButton);
 
   } catch (error) {
     toast("서버에 연결할 수 없습니다.");
