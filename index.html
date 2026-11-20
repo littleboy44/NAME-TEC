@@ -2283,8 +2283,8 @@ const payment = tossPayments.payment({
       },
       orderId: order.orderId,
       orderName: order.orderName,
-      successUrl: window.location.origin + "/payment-success.html",
-      failUrl: window.location.origin + "/payment-fail.html"
+      successUrl: new URL("payment-success.html", window.location.href).href,
+      failUrl: new URL("payment-fail.html", window.location.href).href
     });
 
   } catch (error) {
