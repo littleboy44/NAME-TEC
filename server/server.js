@@ -58,7 +58,8 @@ function verifyAdmin(req, res, next) {
   }
 }
 
-// 토스페이먼츠 결제 승인
+
+// 토스페이먼츠 결제 승인 및 복구
 app.post("/api/payments/confirm", verifyUser, async (req, res) => {
   let client;
 
@@ -83,67 +84,149 @@ app.post("/api/payments/confirm", verifyUser, async (req, res) => {
       });
     }
 
-    // 서버에 저장된 주문 정보 확인
-    const orderResult = await db.query(
+    const authHeader =
+      "Basic " + Buffer.from(secretKey + ":").toString("base64");
+
+    // 1. 주문 잠금 및 결제 상태 확인
+    client = await db.connect();
+    await client.query("BEGIN");
+
+    const orderResult = await client.query(
       `SELECT * FROM payment_orders
        WHERE order_id = $1
        AND user_id = $2
-       AND site_id = $3`,
+       AND site_id = $3
+       FOR UPDATE`,
       [orderId, req.userId, req.siteId]
     );
 
     const order = orderResult.rows[0];
 
     if (!order) {
+      await client.query("ROLLBACK");
       return res.status(404).json({
         message: "주문 정보를 찾을 수 없습니다."
       });
     }
 
-    if (order.status !== "pending") {
-      return res.status(409).json({
-        message: "이미 처리되었거나 유효하지 않은 주문입니다."
-      });
-    }
-
     if (Number(order.amount) !== amount) {
+      await client.query("ROLLBACK");
       return res.status(400).json({
         message: "결제 금액이 주문 정보와 일치하지 않습니다."
       });
     }
 
-    // 토스페이먼츠 승인 요청
-    const tossResponse = await fetch(
-      "https://api.tosspayments.com/v1/payments/confirm",
-      {
-        method: "POST",
-        headers: {
-          Authorization:
-            "Basic " +
-            Buffer.from(secretKey + ":").toString("base64"),
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          paymentKey,
-          orderId,
-          amount
-        })
+    if (order.status === "paid") {
+      if (order.payment_key === paymentKey) {
+        await client.query("COMMIT");
+        return res.json({
+          message: "이미 지급 완료된 결제입니다.",
+          creditsAdded: 0,
+          paymentKey
+        });
       }
-    );
 
-    const tossData = await tossResponse.json();
-
-    if (!tossResponse.ok) {
-      console.error("토스 결제 승인 실패:", tossData);
-
-      return res.status(400).json({
-        message: "결제 승인에 실패했습니다."
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        message: "이미 처리된 주문입니다."
       });
     }
 
     if (
+      order.status === "processing" &&
+      order.payment_key !== paymentKey
+    ) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        message: "다른 결제가 처리 중인 주문입니다."
+      });
+    }
+
+    if (order.status === "pending") {
+      await client.query(
+        `UPDATE payment_orders
+         SET status = 'processing',
+             payment_key = $1
+         WHERE order_id = $2`,
+        [paymentKey, orderId]
+      );
+    } else if (order.status !== "processing") {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        message: "유효하지 않은 주문 상태입니다."
+      });
+    }
+
+    await client.query("COMMIT");
+    client.release();
+    client = null;
+
+    // 2. 토스 결제 승인 요청
+    let tossData = null;
+    let tossResponse = null;
+
+    try {
+      tossResponse = await fetch(
+        "https://api.tosspayments.com/v1/payments/confirm",
+        {
+          method: "POST",
+          headers: {
+            Authorization: authHeader,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            paymentKey,
+            orderId,
+            amount
+          })
+        }
+      );
+
+      tossData = await tossResponse.json();
+    } catch (error) {
+      console.error("토스 승인 요청 통신 오류:", error);
+    }
+
+    // 3. 승인 요청이 실패하거나 응답이 불확실하면 결제 조회
+    if (
+      !tossResponse ||
+      !tossResponse.ok ||
+      !tossData ||
+      tossData.status !== "DONE"
+    ) {
+      try {
+        const lookupResponse = await fetch(
+          `https://api.tosspayments.com/v1/payments/${encodeURIComponent(paymentKey)}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: authHeader
+            }
+          }
+        );
+
+        const lookupData = await lookupResponse.json();
+
+        if (lookupResponse.ok) {
+          tossData = lookupData;
+        } else {
+          console.error("토스 결제 조회 실패:", lookupData);
+          return res.status(502).json({
+            message: "결제 상태를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요."
+          });
+        }
+      } catch (error) {
+        console.error("토스 결제 조회 통신 오류:", error);
+        return res.status(502).json({
+          message: "결제 상태 확인에 실패했습니다. 잠시 후 다시 시도해 주세요."
+        });
+      }
+    }
+
+    // 4. 토스 승인 정보 검증
+    if (
       tossData.orderId !== orderId ||
-      tossData.totalAmount !== amount ||
+      Number(tossData.totalAmount) !== amount ||
       tossData.paymentKey !== paymentKey ||
       tossData.status !== "DONE"
     ) {
@@ -152,41 +235,67 @@ app.post("/api/payments/confirm", verifyUser, async (req, res) => {
       });
     }
 
-    // DB에 결제 및 이용권 지급 기록
+    // 5. DB 트랜잭션으로 이용권 중복 지급 방지
     client = await db.connect();
     await client.query("BEGIN");
 
     const lockedOrder = await client.query(
       `SELECT * FROM payment_orders
        WHERE order_id = $1
+       AND user_id = $2
+       AND site_id = $3
        FOR UPDATE`,
-      [orderId]
+      [orderId, req.userId, req.siteId]
     );
 
     const currentOrder = lockedOrder.rows[0];
 
-    if (!currentOrder || currentOrder.status !== "pending") {
-      await client.query("ROLLBACK");
-
-      return res.status(409).json({
-        message: "이미 처리된 주문입니다."
-      });
+    if (!currentOrder) {
+      throw new Error("주문 정보를 다시 확인할 수 없습니다.");
     }
 
-    await client.query(
-      `INSERT INTO payments
-       (user_id, payment_id, amount, product_type, status, site_id)
-       VALUES ($1, $2, $3, $4, 'DONE', $5)`,
-      [
-        req.userId,
-        paymentKey,
-        amount,
-        currentOrder.product_type,
-        req.siteId
-      ]
-    );
+    if (currentOrder.status === "paid") {
+      if (currentOrder.payment_key === paymentKey) {
+        await client.query("COMMIT");
+        client.release();
+        client = null;
 
-    await client.query(
+        return res.json({
+          message: "이미 지급 완료된 결제입니다.",
+          creditsAdded: 0,
+          paymentKey
+        });
+      }
+
+      throw new Error("다른 결제가 이미 처리된 주문입니다.");
+    }
+
+    if (
+      currentOrder.status !== "processing" ||
+      currentOrder.payment_key !== paymentKey
+    ) {
+      throw new Error("주문 상태가 일치하지 않습니다.");
+    }
+const paymentInsert = await client.query(
+  `INSERT INTO payments
+   (user_id, payment_id, amount, product_type, status, site_id)
+   VALUES ($1, $2, $3, $4, 'DONE', $5)
+   ON CONFLICT (payment_id) DO NOTHING
+   RETURNING id`,
+  [
+    req.userId,
+    paymentKey,
+    amount,
+    currentOrder.product_type,
+    req.siteId
+  ]
+);
+
+if (paymentInsert.rows.length !== 1) {
+  throw new Error("이미 다른 주문에 사용된 결제 키입니다.");
+}
+
+const userUpdate = await client.query(
       `UPDATE users
        SET credits = credits + $1
        WHERE id = $2 AND site_id = $3`,
@@ -197,9 +306,14 @@ app.post("/api/payments/confirm", verifyUser, async (req, res) => {
       ]
     );
 
+    if (userUpdate.rowCount !== 1) {
+      throw new Error("이용권 지급 대상 회원을 찾을 수 없습니다.");
+    }
+
     await client.query(
       `UPDATE payment_orders
-       SET status = 'paid'
+       SET status = 'paid',
+           approved_at = CURRENT_TIMESTAMP
        WHERE order_id = $1`,
       [orderId]
     );
@@ -220,7 +334,7 @@ app.post("/api/payments/confirm", verifyUser, async (req, res) => {
     console.error("결제 승인 처리 오류:", error);
 
     return res.status(500).json({
-      message: "결제 승인 처리 중 오류가 발생했습니다."
+      message: "결제 승인 처리 중 오류가 발생했습니다. 결제 상태를 확인해 주세요."
     });
 
   } finally {

@@ -80,6 +80,15 @@ export async function initializeDatabase() {
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
+    ALTER TABLE payment_orders
+    ADD COLUMN IF NOT EXISTS payment_key TEXT;
+
+    ALTER TABLE payment_orders
+    ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_orders_payment_key
+    ON payment_orders(payment_key);
+
     CREATE INDEX IF NOT EXISTS idx_users_site ON users(site_id);
     CREATE INDEX IF NOT EXISTS idx_payments_site ON payments(site_id);
     CREATE INDEX IF NOT EXISTS idx_credit_logs_site ON credit_logs(site_id);
