@@ -456,6 +456,48 @@
       </tbody>
     </table>
   </div>
+
+<!-- 회원 상세 및 이용권 관리 -->
+<div id="memberDetail" class="admin-table-card"
+     style="display:none; margin-top:25px; padding:25px;">
+
+  <h3>회원 상세 정보</h3>
+
+  <p>회원 번호: <strong id="detailMemberId"></strong></p>
+  <p>이메일: <strong id="detailMemberEmail"></strong></p>
+  <p>보유 이용권: <strong id="detailMemberCredits"></strong></p>
+  <p>프리미엄 만료일: <strong id="detailMemberPremium"></strong></p>
+
+  <hr style="margin:20px 0;">
+
+  <h3>이용권 지급 및 차감</h3>
+
+  <label for="creditAmount">변경 횟수</label>
+  <input
+    type="number"
+    id="creditAmount"
+    placeholder="지급은 3, 차감은 -3"
+    style="display:block; width:100%; padding:12px; margin:10px 0;"
+  >
+
+  <label for="creditReason">변경 사유</label>
+  <input
+    type="text"
+    id="creditReason"
+    placeholder="예: 이벤트 보상 지급"
+    style="display:block; width:100%; padding:12px; margin:10px 0;"
+  >
+
+  <p style="font-size:13px; color:#888;">
+    양수는 지급, 음수는 차감입니다.
+  </p>
+
+  <button type="button" onclick="changeMemberCredits()">
+    이용권 변경 적용
+  </button>
+
+</div>
+
 </div>
 <div id="paymentPage" class="admin-table-card" style="margin-top: 35px; display:none;">
   <h3>결제 내역 관리</h3>
@@ -964,7 +1006,8 @@ async function showMemberDetail(memberId) {
     });
 
   } catch (error) {
-    alert("회원 정보를 불러오는 중 오류가 발생했습니다.");
+    console.error("회원 상세 오류:", error);
+    alert("오류 내용: " + error.message);
   }
 }
 
