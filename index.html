@@ -452,6 +452,7 @@
 
 
 </style>
+<script src="https://js.tosspayments.com/v2/standard"></script>
 </head>
 <body>
 <div class="loading-screen" id="loadingScreen" aria-label="NAME-TEC 로딩 중" role="status">
@@ -593,61 +594,48 @@
 </section>
 </main>
 
+
 <section id="premium" class="wrap">
   <div class="panel premium-panel">
     <div class="origin-status">NAME-TEC PREMIUM</div>
 
     <h2>이름의 가능성을 더 넓게</h2>
-    <p>기본 추천을 넘어, 나만의 특별한 이름을 발견해 보세요.</p>
+    <p>나에게 맞는 프리미엄 이름을 발견해 보세요.</p>
 
+    <div class="premium-price">
+      <h3>나에게 맞는 이용권을 선택하세요</h3>
 
-<div class="premium-price">
-  <span>NAME-TEC PREMIUM</span>
-  <h3>나에게 맞는 이용권을 선택하세요</h3>
+      <div class="premium-benefits">
+        <div>
+          <h3>PLUS</h3>
+          <p><strong>990원</strong></p>
+          <p>프리미엄 이름 생성 3회</p>
+          <button
+            type="button"
+            class="btn"
+            onclick="purchaseProduct('PLUS')">
+            PLUS 구매하기
+          </button>
+        </div>
 
+        <div class="premium-feature">
+          <h3>PREMIUM</h3>
+          <p><strong>2,900원</strong></p>
+          <p>프리미엄 이름 생성 10회</p>
+          <button
+            type="button"
+            class="btn"
+            onclick="purchaseProduct('PREMIUM')">
+            PREMIUM 구매하기
+          </button>
+        </div>
+      </div>
+    </div>
 
-<div class="premium-benefits">
-  <div>
-    <h3>횟수 충전</h3>
-    <p><strong>1,500원</strong></p>
-    <p>프리미엄 이름 생성 5회</p>
-    <p>필요할 때만 충전</p>
-    <p>월정액 가입 불필요</p>
-
-    <button type="button" class="btn" disabled>
-      5회 이용권 구매 준비 중
-    </button>
+    <p>결제 후 이용권이 계정에 자동으로 지급됩니다.</p>
   </div>
-
-  <div class="premium-feature">
-    <h3>월정액</h3>
-    <p><strong>5,900원 / 월</strong></p>
-    <p>프리미엄 기능 이용</p>
-    <p>월 30회 프리미엄 이름 생성</p>
-    <p>추가 프리미엄 기능 제공</p>
-
-    <button type="button" class="btn" disabled>
-      월정액 구매 준비 중
-    </button>
-  </div>
-</div>
-
-
-
-
-</div>
-
-
-
-
-<button type="button" class="btn" disabled>
-  결제 기능 개발 중
-</button>
-
-
-<p>정식 출시 후 이용권을 구매할 수 있습니다.</p>
-</div>
 </section>
+
 
 
 <footer class="wrap footer"><span>© 2026 NAME-TEC. Make your own name.</span><span>서비스 소개 · 이용약관 · 개인정보 처리방침 (준비 중)</span></footer>
@@ -2231,6 +2219,80 @@ async function checkNameTecServer() {
     console.error("NAME-TEC 서버 연결 실패:", error);
   }
 }
+
+
+async function purchaseProduct(productType) {
+  const token = localStorage.getItem("nametec_token");
+
+  if (!token) {
+    toast("결제하려면 먼저 로그인해 주세요.");
+    openModal("auth");
+    return;
+  }
+
+  try {
+    // 1. 결제 설정 불러오기
+    const configResponse = await fetch(
+      "https://name-tec-server.onrender.com/api/payments/config"
+    );
+    const config = await configResponse.json();
+
+    if (!configResponse.ok) {
+      throw new Error(config.message || "결제 설정을 불러오지 못했습니다.");
+    }
+
+    // 2. 서버에서 주문 생성
+    const orderResponse = await fetch(
+      "https://name-tec-server.onrender.com/api/payments/create-order",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token
+        },
+        body: JSON.stringify({ productType })
+      }
+    );
+
+    const order = await orderResponse.json();
+
+    if (!orderResponse.ok) {
+      throw new Error(order.message || "주문 생성에 실패했습니다.");
+    }
+
+
+const user = JSON.parse(
+  localStorage.getItem("nametec_user") || "{}"
+);
+
+if (!user.id) {
+  throw new Error("회원 정보를 확인할 수 없습니다.");
+}
+
+const tossPayments = TossPayments(config.clientKey);
+const payment = tossPayments.payment({
+  customerKey: "USER_" + user.id
+});
+    
+    // 4. 결제창 열기
+    await payment.requestPayment({
+      method: "CARD",
+      amount: {
+        currency: "KRW",
+        value: order.amount
+      },
+      orderId: order.orderId,
+      orderName: order.orderName,
+      successUrl: window.location.origin + "/payment-success.html",
+      failUrl: window.location.origin + "/payment-fail.html"
+    });
+
+  } catch (error) {
+    console.error("결제 요청 오류:", error);
+    toast(error.message || "결제를 시작하지 못했습니다.");
+  }
+}
+
 
 checkNameTecServer();
 updateAuthButton();

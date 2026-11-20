@@ -58,6 +58,176 @@ function verifyAdmin(req, res, next) {
   }
 }
 
+// 토스페이먼츠 결제 승인
+app.post("/api/payments/confirm", verifyUser, async (req, res) => {
+  let client;
+
+  try {
+    const { paymentKey, orderId, amount } = req.body;
+    const secretKey = process.env.TOSS_SECRET_KEY;
+
+    if (!secretKey) {
+      return res.status(500).json({
+        message: "결제 서버 설정이 누락되었습니다."
+      });
+    }
+
+    if (
+      typeof paymentKey !== "string" ||
+      typeof orderId !== "string" ||
+      !Number.isSafeInteger(amount) ||
+      amount <= 0
+    ) {
+      return res.status(400).json({
+        message: "결제 정보가 올바르지 않습니다."
+      });
+    }
+
+    // 서버에 저장된 주문 정보 확인
+    const orderResult = await db.query(
+      `SELECT * FROM payment_orders
+       WHERE order_id = $1
+       AND user_id = $2
+       AND site_id = $3`,
+      [orderId, req.userId, req.siteId]
+    );
+
+    const order = orderResult.rows[0];
+
+    if (!order) {
+      return res.status(404).json({
+        message: "주문 정보를 찾을 수 없습니다."
+      });
+    }
+
+    if (order.status !== "pending") {
+      return res.status(409).json({
+        message: "이미 처리되었거나 유효하지 않은 주문입니다."
+      });
+    }
+
+    if (Number(order.amount) !== amount) {
+      return res.status(400).json({
+        message: "결제 금액이 주문 정보와 일치하지 않습니다."
+      });
+    }
+
+    // 토스페이먼츠 승인 요청
+    const tossResponse = await fetch(
+      "https://api.tosspayments.com/v1/payments/confirm",
+      {
+        method: "POST",
+        headers: {
+          Authorization:
+            "Basic " +
+            Buffer.from(secretKey + ":").toString("base64"),
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          paymentKey,
+          orderId,
+          amount
+        })
+      }
+    );
+
+    const tossData = await tossResponse.json();
+
+    if (!tossResponse.ok) {
+      console.error("토스 결제 승인 실패:", tossData);
+
+      return res.status(400).json({
+        message: "결제 승인에 실패했습니다."
+      });
+    }
+
+    if (
+      tossData.orderId !== orderId ||
+      tossData.totalAmount !== amount ||
+      tossData.paymentKey !== paymentKey ||
+      tossData.status !== "DONE"
+    ) {
+      return res.status(400).json({
+        message: "결제 승인 정보 검증에 실패했습니다."
+      });
+    }
+
+    // DB에 결제 및 이용권 지급 기록
+    client = await db.connect();
+    await client.query("BEGIN");
+
+    const lockedOrder = await client.query(
+      `SELECT * FROM payment_orders
+       WHERE order_id = $1
+       FOR UPDATE`,
+      [orderId]
+    );
+
+    const currentOrder = lockedOrder.rows[0];
+
+    if (!currentOrder || currentOrder.status !== "pending") {
+      await client.query("ROLLBACK");
+
+      return res.status(409).json({
+        message: "이미 처리된 주문입니다."
+      });
+    }
+
+    await client.query(
+      `INSERT INTO payments
+       (user_id, payment_id, amount, product_type, status, site_id)
+       VALUES ($1, $2, $3, $4, 'DONE', $5)`,
+      [
+        req.userId,
+        paymentKey,
+        amount,
+        currentOrder.product_type,
+        req.siteId
+      ]
+    );
+
+    await client.query(
+      `UPDATE users
+       SET credits = credits + $1
+       WHERE id = $2 AND site_id = $3`,
+      [
+        currentOrder.credits,
+        req.userId,
+        req.siteId
+      ]
+    );
+
+    await client.query(
+      `UPDATE payment_orders
+       SET status = 'paid'
+       WHERE order_id = $1`,
+      [orderId]
+    );
+
+    await client.query("COMMIT");
+
+    return res.json({
+      message: "결제가 완료되었습니다.",
+      creditsAdded: currentOrder.credits,
+      paymentKey
+    });
+
+  } catch (error) {
+    if (client) {
+      await client.query("ROLLBACK").catch(() => {});
+    }
+
+    console.error("결제 승인 처리 오류:", error);
+
+    return res.status(500).json({
+      message: "결제 승인 처리 중 오류가 발생했습니다."
+    });
+
+  } finally {
+    client?.release();
+  }
+});
+
 // 회원가입
 app.post("/api/auth/register", async (req, res) => {
   try {
@@ -186,13 +356,36 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
+
+// 토스 결제 클라이언트 키 제공
+app.get("/api/payments/config", (req, res) => {
+  const clientKey = process.env.TOSS_CLIENT_KEY;
+
+  if (!clientKey) {
+    return res.status(500).json({
+      message: "결제 설정이 누락되었습니다."
+    });
+  }
+
+  res.json({ clientKey });
+});
+
+
 // 결제 주문 생성
 app.post("/api/payments/create-order", verifyUser, async (req, res) => {
   try {
-    const products = {
-      PLUS: { name: "NAME-TEC PLUS", amount: 990 },
-      PREMIUM: { name: "NAME-TEC PREMIUM", amount: 2900 }
-    };
+const products = {
+  PLUS: {
+    name: "NAME-TEC PLUS",
+    amount: 990,
+    credits: 3
+  },
+  PREMIUM: {
+    name: "NAME-TEC PREMIUM",
+    amount: 2900,
+    credits: 10
+  }
+};
 
     const product = products[req.body.productType];
 
@@ -205,8 +398,15 @@ app.post("/api/payments/create-order", verifyUser, async (req, res) => {
     await db.query(`
       INSERT INTO payment_orders
       (order_id, user_id, site_id, product_type, amount, credits)
-      VALUES ($1, $2, $3, $4, $5, 0)
-    `, [orderId, req.userId, req.siteId, req.body.productType, product.amount]);
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, [
+  orderId,
+  req.userId,
+  req.siteId,
+  req.body.productType,
+  product.amount,
+  product.credits
+]);
 
     res.status(201).json({
       message: "결제 주문 생성 성공",
