@@ -1277,6 +1277,11 @@ while(chosen.length < resultLimit && chosen.length < pool.length){
   document.getElementById("resultCount").textContent =
     "추천 결과 " + chosen.length + "개";
 
+// 마지막 무료 생성 결과 저장
+window.lastGeneratedNames = [...chosen];
+window.lastGeneratedCategory = category;
+
+// 무료 결과 출력
 document.getElementById("resultsList").innerHTML =
   chosen.map(n => {
     const detail = category === "english"
@@ -1293,11 +1298,24 @@ document.getElementById("resultsList").innerHTML =
           </div>
         </div>
         <button class="save" onclick="saveName('${escapeHTML(n)}')">
-           저장
+          저장
         </button>
       </div>
     `;
-  }).join("");
+  }).join("") +
+  `
+    <div id="premiumGenerationArea" style="margin-top:24px;">
+      <button
+        type="button"
+        class="btn"
+        id="premiumGenerateButton"
+        onclick="generatePremiumNames()"
+      >
+        ✨ 프리미엄 이름 3개 생성하기 (이용권 1회)
+      </button>
+      <div id="premiumResults"></div>
+    </div>
+  `;
 }
 function escapeHTML(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 
@@ -1883,6 +1901,147 @@ const premiumNameBank = {
   riley: ["arwen", "elowen"],
   jordan: ["cassian", "lorcan"]
 };
+
+
+const premiumCategoryBank = {
+  game: [
+    "VoidReaper", "ShadowValkyrie", "AstralKnight",
+    "Nightfall", "FrostWarden", "SoulEclipse",
+    "RavenClaw", "PhantomZero", "StormBreaker",
+    "DarkNova", "AetherBlade", "CrimsonWolf",
+    "LunarGhost", "Obsidian", "StarForged"
+  ],
+
+  brand: [
+    "Aurevia", "Velmora", "Novelle", "Elunova",
+    "Averon", "Lumique", "Orvella", "Zenvia",
+    "Monvera", "Auralis", "Virelle", "Nuvora",
+    "Solvian", "Elaris", "Mavelle"
+  ],
+
+  multi: [
+    "Akari", "Ren", "Sora", "Hikari", "Yuna",
+    "Amara", "Leilani", "Anaya", "Ines", "Lucia",
+    "Mateo", "Rafael", "Santiago", "Zara", "Nadia"
+  ]
+};
+
+
+async function generatePremiumNames() {
+  const button = document.getElementById("premiumGenerateButton");
+  const resultsArea = document.getElementById("premiumResults");
+
+  if (!window.lastGeneratedNames?.length) {
+    toast("먼저 무료 이름을 생성해 주세요.");
+    return;
+  }
+
+  const token = localStorage.getItem("nametec_token");
+
+  if (!token) {
+    toast("프리미엄 생성을 이용하려면 로그인해 주세요.");
+    openModal("auth");
+    return;
+  }
+
+  if (button.disabled) return;
+
+  button.disabled = true;
+  button.textContent = "프리미엄 이름 생성 중...";
+
+  try {
+    const category = window.lastGeneratedCategory;
+    const freeNames = window.lastGeneratedNames.map(
+      name => name.toLowerCase()
+    );
+
+    let pool = [];
+
+    if (category === "english") {
+      const relatedNames = window.lastGeneratedNames.flatMap(name =>
+        premiumNameBank[name.toLowerCase()] || []
+      );
+
+      const fallbackNames = Object.values(premiumNameBank).flat();
+
+      pool = [...new Set([...relatedNames, ...fallbackNames])];
+    } else {
+      pool = [...(premiumCategoryBank[category] || [])];
+    }
+
+    pool = pool.filter(name =>
+      !freeNames.includes(name.toLowerCase())
+    );
+
+    pool = [...new Set(pool)];
+
+    if (pool.length < 3) {
+      throw new Error("프리미엄 이름 데이터가 부족합니다.");
+    }
+
+    // 서버에서 이용권 1회 차감
+    const response = await fetch(
+      "https://name-tec-server.onrender.com/api/credits/use",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({})
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "이용권 사용에 실패했습니다.");
+    }
+
+    // 최신 잔액 저장 및 화면 갱신
+    const user = JSON.parse(
+      localStorage.getItem("nametec_user") || "null"
+    );
+
+    if (user) {
+      user.credits = Number(data.credits);
+      localStorage.setItem("nametec_user", JSON.stringify(user));
+      updateAuthButton();
+    }
+
+    // 프리미엄 이름 3개 선택
+    const chosen = [];
+
+    while (chosen.length < 3 && pool.length > 0) {
+      const index = Math.floor(Math.random() * pool.length);
+      chosen.push(pool.splice(index, 1)[0]);
+    }
+
+    resultsArea.innerHTML = `
+      <h3 style="margin:20px 0 12px;">✨ PREMIUM EXCLUSIVE</h3>
+      ${chosen.map(name => `
+        <div class="name-result">
+          <div>
+            <h3>${escapeHTML(name)}</h3>
+            <p>NAME-TEC 프리미엄 추천 이름</p>
+          </div>
+          <button class="save" onclick="saveName('${escapeHTML(name)}')">
+            저장
+          </button>
+        </div>
+      `).join("")}
+    `;
+
+    toast("프리미엄 이름 생성 완료! 이용권 1회가 사용되었습니다.");
+
+  } catch (error) {
+    toast(error.message || "프리미엄 생성에 실패했습니다.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "✨ 프리미엄 이름 3개 생성하기 (이용권 1회)";
+  }
+}
+
 
 // NAME-TEC 회원 등급 관리 (개발용)
 let isPremiumMember = localStorage.getItem("nametec_premium") === "true";

@@ -835,6 +835,74 @@ app.get("/api/admin/credit-logs", verifyAdmin, async (req, res) => {
   }
 });
 
+// 회원 프리미엄 이용권 1회 사용
+app.post("/api/credits/use", verifyUser, async (req, res) => {
+  const client = await db.connect();
+
+  try {
+    const userId = req.userId;
+    const siteId = Number(req.siteId);
+
+    if (!Number.isInteger(siteId) || siteId <= 0) {
+      return res.status(400).json({ message: "사이트 정보가 올바르지 않습니다." });
+    }
+
+    await client.query("BEGIN");
+
+    const result = await client.query(
+      `SELECT id, credits
+       FROM users
+       WHERE id = $1 AND site_id = $2
+       FOR UPDATE`,
+      [userId, siteId]
+    );
+
+    const user = result.rows[0];
+
+    if (!user) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "회원을 찾을 수 없습니다." });
+    }
+
+    if (user.credits < 1) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: "이용권이 부족합니다." });
+    }
+
+    await client.query(
+      `UPDATE users
+       SET credits = credits - 1
+       WHERE id = $1 AND site_id = $2`,
+      [userId, siteId]
+    );
+
+    await client.query(
+      `INSERT INTO credit_logs
+       (admin_id, user_id, change_amount, reason, site_id)
+       VALUES (NULL, $1, -1, $2, $3)`,
+      [userId, "프리미엄 이름 생성", siteId]
+    );
+
+    await client.query("COMMIT");
+
+    const updated = await client.query(
+      "SELECT credits FROM users WHERE id = $1 AND site_id = $2",
+      [userId, siteId]
+    );
+
+    return res.json({
+      message: "이용권 1회 사용 완료",
+      credits: updated.rows[0].credits
+    });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("이용권 사용 오류:", error);
+    return res.status(500).json({ message: "이용권 사용에 실패했습니다." });
+  } finally {
+    client.release();
+  }
+});
+
 // 사이트 목록
 app.get("/api/admin/sites", verifyAdmin, async (req, res) => {
   try {

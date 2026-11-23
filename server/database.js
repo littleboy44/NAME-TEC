@@ -61,13 +61,16 @@ export async function initializeDatabase() {
 
     CREATE TABLE IF NOT EXISTS credit_logs (
       id BIGSERIAL PRIMARY KEY,
-      admin_id BIGINT NOT NULL REFERENCES admins(id),
+      admin_id BIGINT REFERENCES admins(id),
       user_id BIGINT NOT NULL REFERENCES users(id),
       change_amount INTEGER NOT NULL,
       reason TEXT NOT NULL,
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       site_id BIGINT REFERENCES sites(id)
     );
+
+      ALTER TABLE credit_logs
+      ALTER COLUMN admin_id DROP NOT NULL;
 
     CREATE TABLE IF NOT EXISTS payment_orders (
       order_id TEXT PRIMARY KEY,
