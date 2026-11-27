@@ -1387,49 +1387,66 @@ while(chosen.length < resultLimit && chosen.length < pool.length){
     creative:"예명·브랜드"
   };
 
+
+  const resultArea = document.getElementById("resultsList");
+
   document.getElementById("resultCount").textContent =
     "추천 결과 " + chosen.length + "개";
 
-// 마지막 무료 생성 결과 저장
-window.lastGeneratedNames = [...chosen];
-window.lastGeneratedCategory = category;
+  // 마지막 무료 생성 결과 저장
+  window.lastGeneratedNames = [...chosen];
+  window.lastGeneratedCategory = category;
 
-// 무료 결과 출력
-document.getElementById("resultsList").innerHTML =
-  chosen.map(n => {
-    const detail = category === "english"
-      ? `${desc[vibe]} 느낌 · ${purposeText[purpose]}에 어울리는 후보`
-      : `${description} 추천 후보`;
-
-    return `
-      <div class="name-result">
-        <div>
-          <h3>${escapeHTML(n)}</h3>
-          <p>${detail}</p>
-          <div class="name-info">
-            ${getNameInfo(n, category)}
-          </div>
-        </div>
-        <button class="save" onclick="saveName('${escapeHTML(n)}')">
-          저장
-        </button>
-      </div>
-    `;
-  }).join("") +
-  `
-    <div id="premiumGenerationArea" style="margin-top:24px;">
-      <button
-        type="button"
-        class="btn"
-        id="premiumGenerateButton"
-        onclick="generatePremiumNames()"
-      >
-        ✨ 프리미엄 이름 3개 생성하기 (이용권 1회)
-      </button>
-      <div id="premiumResults"></div>
+  // 결과 영역에 로딩 표시
+  resultArea.innerHTML = `
+    <div class="name-loading" style="text-align:center; padding:55px 15px;">
+      <div style="font-size:30px; margin-bottom:12px;">⚙️</div>
+      <strong>나에게 어울리는 이름을 찾고 있어요...</strong>
+      <p style="margin-top:8px; color:#796b5d;">
+        취향에 맞는 이름을 정리하고 있습니다.
+      </p>
     </div>
   `;
+
+  // 0.7초 후 추천 결과 표시
+  setTimeout(() => {
+    resultArea.innerHTML =
+      chosen.map(n => {
+        const detail = category === "english"
+          ? `${desc[vibe]} 느낌 · ${purposeText[purpose]}에 어울리는 후보`
+          : `${description} 추천 후보`;
+
+        return `
+          <div class="name-result">
+            <div>
+              <h3>${escapeHTML(n)}</h3>
+              <p>${detail}</p>
+              <div class="name-info">
+                ${getNameInfo(n, category)}
+              </div>
+            </div>
+            <button class="save" onclick="saveName('${escapeHTML(n)}')">
+              저장
+            </button>
+          </div>
+        `;
+      }).join("") +
+      `
+        <div id="premiumGenerationArea" style="margin-top:24px;">
+          <button
+            type="button"
+            class="btn"
+            id="premiumGenerateButton"
+            onclick="generatePremiumNames()"
+          >
+            ✨ 프리미엄 이름 3개 생성하기 (이용권 1회)
+          </button>
+          <div id="premiumResults"></div>
+        </div>
+      `;
+  }, 700);
 }
+
 function escapeHTML(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 
 
@@ -2062,6 +2079,16 @@ async function generatePremiumNames() {
   button.disabled = true;
   button.textContent = "프리미엄 이름 생성 중...";
 
+  resultsArea.innerHTML = `
+  <div style="text-align:center; padding:35px 15px;">
+    <div style="font-size:30px; margin-bottom:12px;">✨</div>
+    <strong>특별한 이름을 엄선하고 있어요...</strong>
+    <p style="margin-top:8px; color:#796b5d;">
+      프리미엄 이름을 준비하고 있습니다.
+    </p>
+  </div>
+`;
+
   try {
     const category = window.lastGeneratedCategory;
     const freeNames = window.lastGeneratedNames.map(
@@ -2130,6 +2157,9 @@ async function generatePremiumNames() {
       chosen.push(pool.splice(index, 1)[0]);
     }
 
+    // 프리미엄 로딩 시간
+    await new Promise(resolve => setTimeout(resolve, 1300));
+
     resultsArea.innerHTML = `
       <h3 style="margin:20px 0 12px;">✨ PREMIUM EXCLUSIVE</h3>
       ${chosen.map(name => `
@@ -2147,9 +2177,16 @@ async function generatePremiumNames() {
 
     toast("프리미엄 이름 생성 완료! 이용권 1회가 사용되었습니다.");
 
-  } catch (error) {
-    toast(error.message || "프리미엄 생성에 실패했습니다.");
-  } finally {
+} catch (error) {
+  console.error("프리미엄 생성 실제 오류:", error);
+
+  resultsArea.innerHTML = `
+    <p style="text-align:center; padding:20px;">
+      프리미엄 추천에 실패했습니다. 다시 시도해 주세요.
+    </p>
+  `;
+  toast(error.message || "프리미엄 생성에 실패했습니다.");
+} finally {
     button.disabled = false;
     button.textContent = "✨ 프리미엄 이름 3개 생성하기 (이용권 1회)";
   }
@@ -2668,6 +2705,23 @@ const payment = tossPayments.payment({
 checkNameTecServer();
 updateAuthButton();
 </script>
+
+
+<footer style="
+  padding: 30px 20px;
+  margin-top: 50px;
+  border-top: 1px solid #e8e4df;
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+">
+  <div style="display:flex; justify-content:center; gap:20px; flex-wrap:wrap;">
+    <a href="privacy.html">개인정보처리방침</a>
+    <a href="terms.html">이용약관</a>
+    <a href="contact.html">문의하기</a>
+  </div>
+  <p>© 2026 NAME-TEC. All rights reserved.</p>
+</footer>
 
 
 </body>

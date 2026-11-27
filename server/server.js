@@ -223,17 +223,56 @@ app.post("/api/payments/confirm", verifyUser, async (req, res) => {
       }
     }
 
-    // 4. 토스 승인 정보 검증
-    if (
-      tossData.orderId !== orderId ||
-      Number(tossData.totalAmount) !== amount ||
-      tossData.paymentKey !== paymentKey ||
-      tossData.status !== "DONE"
-    ) {
-      return res.status(400).json({
-        message: "결제 승인 정보 검증에 실패했습니다."
-      });
+// 4. 토스 승인 정보 검증
+if (
+  !tossData ||
+  tossData.orderId !== orderId ||
+  Number(tossData.totalAmount) !== amount ||
+  tossData.paymentKey !== paymentKey
+) {
+  return res.status(400).json({
+    message: "결제 승인 정보 검증에 실패했습니다."
+  });
+}
+
+// 결제 완료가 아닌 경우
+if (tossData.status !== "DONE") {
+  console.error("토스 결제 미완료:", tossData.status);
+
+  // 취소 또는 승인 거절 등 확실한 실패 상태만 주문 실패 처리
+  if (["CANCELED", "ABORTED", "EXPIRED"].includes(tossData.status)) {
+    const failClient = await db.connect();
+
+    try {
+      await failClient.query("BEGIN");
+
+      await failClient.query(
+        `UPDATE payment_orders
+         SET status = 'failed',
+             payment_key = NULL
+         WHERE order_id = $1
+           AND user_id = $2
+           AND site_id = $3
+           AND status = 'processing'
+           AND payment_key = $4`,
+        [orderId, req.userId, req.siteId, paymentKey]
+      );
+
+      await failClient.query("COMMIT");
+    } catch (error) {
+      await failClient.query("ROLLBACK").catch(() => {});
+      throw error;
+    } finally {
+      failClient.release();
     }
+  }
+
+  return res.status(409).json({
+    message: "결제가 완료되지 않았습니다. 결제 상태를 확인해 주세요."
+  });
+}
+
+// 5번 DB 트랜잭션으로 이어짐
 
     // 5. DB 트랜잭션으로 이용권 중복 지급 방지
     client = await db.connect();
@@ -555,24 +594,39 @@ app.get("/api/db-health", async (req, res) => {
   }
 });
 
+
 // 관리자 로그인
 app.post("/api/admin/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: "이메일과 비밀번호를 입력해 주세요." });
+      return res.status(400).json({
+        message: "이메일과 비밀번호를 입력해 주세요."
+      });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const allowedEmail = String(ADMIN_EMAIL).trim().toLowerCase();
+
+    // 환경변수에 등록된 관리자 이메일만 허용
+    if (normalizedEmail !== allowedEmail) {
+      return res.status(401).json({
+        message: "로그인 정보가 올바르지 않습니다."
+      });
     }
 
     const result = await db.query(
-      "SELECT * FROM admins WHERE email = $1",
-      [email]
+      "SELECT * FROM admins WHERE LOWER(email) = $1",
+      [normalizedEmail]
     );
 
     const admin = result.rows[0];
 
     if (!admin || !(await bcrypt.compare(password, admin.password_hash))) {
-      return res.status(401).json({ message: "로그인 정보가 올바르지 않습니다." });
+      return res.status(401).json({
+        message: "로그인 정보가 올바르지 않습니다."
+      });
     }
 
     const token = jwt.sign(
@@ -581,12 +635,19 @@ app.post("/api/admin/login", async (req, res) => {
       { expiresIn: "1h" }
     );
 
-    res.json({ message: "관리자 로그인 성공", token });
+    res.json({
+      message: "관리자 로그인 성공",
+      token
+    });
+
   } catch (error) {
     console.error("관리자 로그인 오류:", error);
-    res.status(500).json({ message: "서버 오류가 발생했습니다." });
+    res.status(500).json({
+      message: "서버 오류가 발생했습니다."
+    });
   }
 });
+
 
 // 전체 대시보드
 app.get("/api/admin/dashboard", verifyAdmin, async (req, res) => {

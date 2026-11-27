@@ -1,16 +1,64 @@
-
+```html
 <!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>결제 실패 - NAME-TEC</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: #fffdfa;
+      color: #292929;
+      font-family: Arial, sans-serif;
+    }
+    .container {
+      width: 100%;
+      max-width: 420px;
+      padding: 40px 28px;
+      text-align: center;
+      background: white;
+      border: 1px solid #e8e4df;
+      border-radius: 18px;
+    }
+    .icon {
+      font-size: 48px;
+      margin-bottom: 18px;
+    }
+    h1 { font-size: 23px; }
+    p {
+      color: #666;
+      line-height: 1.7;
+      overflow-wrap: anywhere;
+    }
+    a {
+      display: block;
+      margin-top: 24px;
+      padding: 14px;
+      border-radius: 10px;
+      background: #ff7a00;
+      color: white;
+      text-decoration: none;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
-  <h1>결제가 완료되지 않았습니다.</h1>
-  <p id="reason">결제가 취소되었거나 승인에 실패했습니다.</p>
-
-  <a href="index.html#premium">다시 결제하기</a>
+  <main class="container">
+    <div class="icon">⚠️</div>
+    <h1>결제가 완료되지 않았습니다.</h1>
+    <p id="reason">결제가 취소되었거나 승인에 실패했습니다.</p>
+    <a href="./index.html#premium">다시 결제하기</a>
+    <a href="./index.html" style="background:#eee;color:#292929;">
+      메인으로 돌아가기
+    </a>
+  </main>
 
   <script>
     const params = new URLSearchParams(window.location.search);
@@ -22,3 +70,4 @@
   </script>
 </body>
 </html>
+```
