@@ -1172,7 +1172,7 @@ app.get("/api/admin/analytics", verifyAdmin, async (req, res) => {
            WHERE site_id = $1
            GROUP BY visitor_id
            HAVING COUNT(DISTINCT session_id) > 1
-         ) AS returning`,
+         ) AS returning_users`,
         [siteId]
       ),
 
