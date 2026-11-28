@@ -1020,6 +1020,220 @@ app.post("/api/admin/sites", verifyAdmin, async (req, res) => {
   }
 });
 
+// 익명 방문자 통계 기록 API
+app.post("/api/analytics/track", async (req, res) => {
+  let client;
+
+  try {
+    const { siteSlug, visitorId, sessionId, path, eventType } = req.body;
+
+    const uuidPattern =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+    if (
+      typeof siteSlug !== "string" ||
+      typeof visitorId !== "string" ||
+      typeof sessionId !== "string" ||
+      !uuidPattern.test(visitorId) ||
+      !uuidPattern.test(sessionId) ||
+      typeof path !== "string" ||
+      !path.startsWith("/") ||
+      path.length > 200 ||
+      !["pageview", "heartbeat"].includes(eventType)
+    ) {
+      return res.status(400).json({
+        message: "방문 기록 정보가 올바르지 않습니다."
+      });
+    }
+
+    client = await db.connect();
+    await client.query("BEGIN");
+
+    const siteResult = await client.query(
+      "SELECT id FROM sites WHERE slug = $1",
+      [siteSlug]
+    );
+
+    if (siteResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        message: "등록된 사이트가 없습니다."
+      });
+    }
+
+    const siteId = siteResult.rows[0].id;
+
+    await client.query(
+      `INSERT INTO visitors (site_id, visitor_id)
+       VALUES ($1, $2)
+       ON CONFLICT (site_id, visitor_id)
+       DO UPDATE SET last_seen = CURRENT_TIMESTAMP`,
+      [siteId, visitorId]
+    );
+
+    await client.query(
+      `INSERT INTO visitor_sessions
+       (site_id, visitor_id, session_id)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (site_id, session_id)
+       DO UPDATE SET last_seen = CURRENT_TIMESTAMP`,
+      [siteId, visitorId, sessionId]
+    );
+
+    await client.query(
+      `UPDATE visitors
+       SET last_seen = CURRENT_TIMESTAMP
+       WHERE site_id = $1 AND visitor_id = $2`,
+      [siteId, visitorId]
+    );
+
+    if (eventType === "pageview") {
+      await client.query(
+        `INSERT INTO page_views
+         (site_id, visitor_id, session_id, path)
+         VALUES ($1, $2, $3, $4)`,
+        [siteId, visitorId, sessionId, path]
+      );
+    }
+
+    await client.query("COMMIT");
+
+    res.json({ success: true });
+  } catch (error) {
+    if (client) await client.query("ROLLBACK").catch(() => {});
+    console.error("방문자 기록 오류:", error);
+    res.status(500).json({
+      message: "방문자 기록에 실패했습니다."
+    });
+  } finally {
+    client?.release();
+  }
+});
+
+// 관리자 방문자 통계 조회
+app.get("/api/admin/analytics", verifyAdmin, async (req, res) => {
+  try {
+    const siteId = Number(req.query.siteId);
+
+    if (!Number.isSafeInteger(siteId) || siteId <= 0) {
+      return res.status(400).json({
+        message: "사이트 정보가 올바르지 않습니다."
+      });
+    }
+
+    const siteResult = await db.query(
+      "SELECT id, name, slug FROM sites WHERE id = $1",
+      [siteId]
+    );
+
+    if (siteResult.rows.length === 0) {
+      return res.status(404).json({
+        message: "사이트를 찾을 수 없습니다."
+      });
+    }
+
+    const [
+      totalVisitors,
+      todayVisitors,
+      activeVisitors,
+      returningVisitors,
+      totalViews,
+      popularPages,
+      dailyTrend
+    ] = await Promise.all([
+      db.query(
+        `SELECT COUNT(*) AS count
+         FROM visitors WHERE site_id = $1`,
+        [siteId]
+      ),
+
+      db.query(
+        `SELECT COUNT(DISTINCT visitor_id) AS count
+         FROM page_views
+         WHERE site_id = $1
+         AND (created_at AT TIME ZONE 'Asia/Seoul')::date =
+             (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date`,
+        [siteId]
+      ),
+
+      db.query(
+        `SELECT COUNT(DISTINCT session_id) AS count
+         FROM visitor_sessions
+         WHERE site_id = $1
+         AND last_seen >= NOW() - INTERVAL '5 minutes'`,
+        [siteId]
+      ),
+
+      db.query(
+        `SELECT COUNT(*) AS count
+         FROM (
+           SELECT visitor_id
+           FROM visitor_sessions
+           WHERE site_id = $1
+           GROUP BY visitor_id
+           HAVING COUNT(DISTINCT session_id) > 1
+         ) AS returning`,
+        [siteId]
+      ),
+
+      db.query(
+        `SELECT COUNT(*) AS count
+         FROM page_views WHERE site_id = $1`,
+        [siteId]
+      ),
+
+      db.query(
+        `SELECT path, COUNT(*) AS views
+         FROM page_views
+         WHERE site_id = $1
+         GROUP BY path
+         ORDER BY COUNT(*) DESC
+         LIMIT 10`,
+        [siteId]
+      ),
+
+      db.query(
+        `SELECT
+           TO_CHAR(day::date, 'YYYY-MM-DD') AS date,
+           COUNT(DISTINCT pv.visitor_id) AS visitors
+         FROM generate_series(
+           (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date - 6,
+           (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date,
+           INTERVAL '1 day'
+         ) AS day
+         LEFT JOIN page_views pv
+           ON pv.site_id = $1
+           AND (pv.created_at AT TIME ZONE 'Asia/Seoul')::date = day::date
+         GROUP BY day
+         ORDER BY day`,
+        [siteId]
+      )
+    ]);
+
+    res.json({
+      site: siteResult.rows[0],
+      stats: {
+        totalVisitors: Number(totalVisitors.rows[0].count),
+        todayVisitors: Number(todayVisitors.rows[0].count),
+        activeVisitors: Number(activeVisitors.rows[0].count),
+        returningVisitors: Number(returningVisitors.rows[0].count),
+        totalViews: Number(totalViews.rows[0].count)
+      },
+      popularPages: popularPages.rows,
+      dailyTrend: dailyTrend.rows.map(row => ({
+        date: row.date,
+        visitors: Number(row.visitors)
+      }))
+    });
+
+  } catch (error) {
+    console.error("방문자 통계 조회 오류:", error);
+    res.status(500).json({
+      message: "방문자 통계를 불러오지 못했습니다."
+    });
+  }
+});
+
 // 서버 시작
 async function startServer() {
   try {

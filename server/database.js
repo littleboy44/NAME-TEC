@@ -95,6 +95,54 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_users_site ON users(site_id);
     CREATE INDEX IF NOT EXISTS idx_payments_site ON payments(site_id);
     CREATE INDEX IF NOT EXISTS idx_credit_logs_site ON credit_logs(site_id);
+  -- 방문자 정보
+CREATE TABLE IF NOT EXISTS visitors (
+  id BIGSERIAL PRIMARY KEY,
+  site_id BIGINT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  visitor_id TEXT NOT NULL,
+  first_seen TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  last_seen TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(site_id, visitor_id)
+);
+
+-- 방문 세션
+CREATE TABLE IF NOT EXISTS visitor_sessions (
+  id BIGSERIAL PRIMARY KEY,
+  site_id BIGINT NOT NULL,
+  visitor_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  started_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  last_seen TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(site_id, session_id),
+  FOREIGN KEY (site_id, visitor_id)
+    REFERENCES visitors(site_id, visitor_id)
+    ON DELETE CASCADE
+);
+
+-- 페이지 조회 기록
+CREATE TABLE IF NOT EXISTS page_views (
+  id BIGSERIAL PRIMARY KEY,
+  site_id BIGINT NOT NULL,
+  visitor_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  path TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (site_id, visitor_id)
+    REFERENCES visitors(site_id, visitor_id)
+    ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_visitors_site
+ON visitors(site_id);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_active
+ON visitor_sessions(site_id, last_seen);
+
+CREATE INDEX IF NOT EXISTS idx_page_views_site_date
+ON page_views(site_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_page_views_path
+ON page_views(site_id, path);
   `);
 
   console.log("NAME-TEC PostgreSQL 데이터베이스 준비 완료!");

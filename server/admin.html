@@ -389,6 +389,9 @@
   <button type="button" onclick="showSiteTab('stats')">
     통계 분석
   </button>
+<button type="button" onclick="showSiteTab('visitors')">
+  방문자 통계
+</button>
 </div>
 <div id="creditPage" class="admin-table-card" style="display:none; margin-top:30px;">
   <h3>이용권 변경 기록</h3>
@@ -433,7 +436,87 @@
     <p>이용권 변경 기록</p>
     <h2 id="statsCreditCount">0건</h2>
   </div>
+<!-- 방문자 통계 -->
+<div id="visitorPage" class="admin-table-card"
+     style="display:none; margin-top:30px;">
+
+  <h3>방문자 통계</h3>
+  <p class="info">선택한 사이트의 익명 방문 데이터를 분석합니다.</p>
+
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:15px;">
+
+    <div class="card">
+      <p>누적 방문자</p>
+      <h2 id="totalVisitors">0명</h2>
+    </div>
+
+    <div class="card">
+      <p>오늘 방문자</p>
+      <h2 id="todayVisitors">0명</h2>
+    </div>
+
+    <div class="card">
+      <p>실시간 접속자</p>
+      <h2 id="activeVisitors">0명</h2>
+    </div>
+
+    <div class="card">
+      <p>재방문자</p>
+      <h2 id="returningVisitors">0명</h2>
+    </div>
+
+    <div class="card">
+      <p>전체 페이지 조회</p>
+      <h2 id="totalViews">0회</h2>
+    </div>
+
+  </div>
+
+  <h3 style="margin-top:30px;">인기 페이지 TOP 10</h3>
+
+  <div style="overflow-x:auto;">
+    <table style="width:100%; border-collapse:collapse; text-align:left;">
+      <thead>
+        <tr>
+          <th style="padding:12px;">페이지</th>
+          <th style="padding:12px;">조회 수</th>
+        </tr>
+      </thead>
+      <tbody id="popularPagesTable">
+        <tr>
+          <td colspan="2" style="padding:15px;">
+            방문자 데이터를 불러오는 중입니다.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 style="margin-top:30px;">최근 7일 방문자 추이</h3>
+
+  <div style="overflow-x:auto;">
+    <table style="width:100%; border-collapse:collapse; text-align:left;">
+      <thead>
+        <tr>
+          <th style="padding:12px;">날짜</th>
+          <th style="padding:12px;">방문자 수</th>
+        </tr>
+      </thead>
+      <tbody id="dailyTrendTable">
+        <tr>
+          <td colspan="2" style="padding:15px;">
+            방문자 데이터를 불러오는 중입니다.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
 </div>
+
+</div>
+
+
 <div id="memberPage" class="admin-table-card" style="margin-top: 30px; display:none;">
   <h3>회원 관리</h3>
 
@@ -721,6 +804,76 @@ function openManagedSite(siteName, clickedMenu) {
   selectSite();
 }
 
+// 방문자 통계 불러오기
+async function loadVisitorAnalytics() {
+  const siteId = document.getElementById("siteSelect").value;
+
+  if (!siteId) return;
+
+  try {
+    const response = await fetch(
+      `https://name-tec-server.onrender.com/api/admin/analytics?siteId=${siteId}`,
+      {
+        headers: {
+          Authorization: "Bearer " + adminToken
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("방문자 통계를 불러오지 못했습니다.");
+    }
+
+    const data = await response.json();
+    const stats = data.stats;
+
+    document.getElementById("totalVisitors").textContent =
+      stats.totalVisitors.toLocaleString("ko-KR") + "명";
+
+    document.getElementById("todayVisitors").textContent =
+      stats.todayVisitors.toLocaleString("ko-KR") + "명";
+
+    document.getElementById("activeVisitors").textContent =
+      stats.activeVisitors.toLocaleString("ko-KR") + "명";
+
+    document.getElementById("returningVisitors").textContent =
+      stats.returningVisitors.toLocaleString("ko-KR") + "명";
+
+    document.getElementById("totalViews").textContent =
+      stats.totalViews.toLocaleString("ko-KR") + "회";
+
+    document.getElementById("popularPagesTable").innerHTML =
+      data.popularPages.length
+        ? data.popularPages.map(page => `
+            <tr>
+              <td style="padding:12px;">
+                ${escapeHTML(page.path)}
+              </td>
+              <td style="padding:12px;">
+                ${Number(page.views).toLocaleString("ko-KR")}회
+              </td>
+            </tr>
+          `).join("")
+        : `<tr><td colspan="2" style="padding:15px;">아직 방문 기록이 없습니다.</td></tr>`;
+
+    document.getElementById("dailyTrendTable").innerHTML =
+      data.dailyTrend.map(day => `
+        <tr>
+          <td style="padding:12px;">${escapeHTML(day.date)}</td>
+          <td style="padding:12px;">
+            ${Number(day.visitors).toLocaleString("ko-KR")}명
+          </td>
+        </tr>
+      `).join("");
+
+  } catch (error) {
+    console.error("방문자 통계 오류:", error);
+
+    document.getElementById("popularPagesTable").innerHTML =
+      `<tr><td colspan="2" style="padding:15px;">통계를 불러오지 못했습니다.</td></tr>`;
+  }
+}
+
 function showSiteTab(tab) {
   document.getElementById("memberPage").style.display =
     tab === "members" ? "block" : "none";
@@ -730,11 +883,17 @@ function showSiteTab(tab) {
 
   document.getElementById("creditPage").style.display =
     tab === "credits" ? "block" : "none";
-   
-document.getElementById("statsPage").style.display =
-  tab === "stats" ? "block" : "none"; 
-}
 
+  document.getElementById("statsPage").style.display =
+    tab === "stats" ? "block" : "none";
+
+  document.getElementById("visitorPage").style.display =
+    tab === "visitors" ? "block" : "none";
+
+  if (tab === "visitors") {
+    loadVisitorAnalytics();
+  }
+}
 
 function showAdminPage(page, clickedMenu) {
 
