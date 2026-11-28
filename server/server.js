@@ -1234,6 +1234,45 @@ app.get("/api/admin/analytics", verifyAdmin, async (req, res) => {
   }
 });
 
+
+// 4개월이 지난 방문자 통계 데이터 자동 삭제
+async function cleanupOldAnalytics() {
+  let client;
+
+  try {
+    client = await db.connect();
+    await client.query("BEGIN");
+
+    await client.query(`
+      DELETE FROM page_views
+      WHERE created_at < NOW() - INTERVAL '4 months'
+    `);
+
+    await client.query(`
+      DELETE FROM visitor_sessions
+      WHERE last_seen < NOW() - INTERVAL '4 months'
+    `);
+
+    await client.query(`
+      DELETE FROM visitors
+      WHERE last_seen < NOW() - INTERVAL '4 months'
+    `);
+
+    await client.query("COMMIT");
+
+    console.log("4개월 지난 방문자 통계 데이터 정리 완료!");
+  } catch (error) {
+    if (client) {
+      await client.query("ROLLBACK").catch(() => {});
+    }
+
+    console.error("방문자 통계 데이터 정리 오류:", error);
+  } finally {
+    client?.release();
+  }
+}
+
+
 // 서버 시작
 async function startServer() {
   try {
@@ -1242,6 +1281,14 @@ async function startServer() {
     }
 
     await initializeDatabase();
+
+    // 서버 시작 시 오래된 방문자 데이터 정리
+    await cleanupOldAnalytics();
+
+    // 이후 24시간마다 자동 정리
+    setInterval(() => {
+      cleanupOldAnalytics();
+    }, 24 * 60 * 60 * 1000);
 
     const existingAdmin = await db.query(
       "SELECT id FROM admins WHERE email = $1",
